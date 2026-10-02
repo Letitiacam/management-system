@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduTrack 補習班與課程管理系統</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Vue.js 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Google Fonts Inter & Noto Sans TC -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; }
+        [v-cloak] { display: none; }
+    </style>
+</head>
+<body class="h-full text-slate-800 flex flex-col antialiased selection:bg-brand-500 selection:text-white">
+
+    <div id="app" v-cloak class="min-h-screen flex flex-col">
+        <!-- Top Header Navigation -->
+        <header class="bg-slate-900 text-white shadow-md border-b border-slate-800 sticky top-0 z-30">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <!-- Brand Logo -->
+                    <div class="flex items-center space-x-3 cursor-pointer" @click="activeTab = isAdmin ? 'dashboard' : 'public-lookup'">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                            <i class="fa-solid fa-graduation-cap"></i>
+                        </div>
+                        <div>
+                            <span class="font-bold text-lg tracking-wide text-white block leading-none">EduTrack</span>
+                            <span class="text-xs text-slate-400">補習班與課程學費管理系統</span>
+                        </div>
+                    </div>
+
+                    <!-- Right Controls (Admin Login Status & Quick Access) -->
+                    <div class="flex items-center space-x-3">
+                        <button v-if="!isAdmin" @click="showLoginModal = true" class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 transition border border-slate-700">
+                            <i class="fa-solid fa-lock text-xs text-amber-400"></i>
+                            <span>管理者登入</span>
+                        </button>
+
+                        <div v-else class="flex items-center space-x-2 bg-slate-800 rounded-lg p-1 pr-3 border border-slate-700">
+                            <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-xs font-semibold">管理者權限</span>
+                            <button @click="showPasswordModal = true" class="text-xs text-slate-300 hover:text-white px-2 py-1 transition" title="修改密碼">
+                                <i class="fa-solid fa-key"></i>
+                            </button>
+                            <button @click="logout" class="text-xs text-rose-400 hover:text-rose-300 px-2 py-1 transition" title="登出">
+                                <i class="fa-solid fa-right-from-bracket"></i> 登出
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Navigation Bar -->
+            <div class="bg-slate-800 border-t border-slate-700/50 px-4 sm:px-6 lg:px-8 overflow-x-auto scrollbar-none">
+                <div class="max-w-7xl mx-auto flex space-x-1 sm:space-x-4 py-2">
+                    <button @click="activeTab = 'public-lookup'" :class="tabClass('public-lookup')" class="px-3.5 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap flex items-center space-x-2">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <span>學員課堂查詢端</span>
+                    </button>
+                    <!-- 數據總覽改為僅管理者可見 -->
+                    <button v-if="isAdmin" @click="activeTab = 'dashboard'" :class="tabClass('dashboard')" class="px-3.5 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap flex items-center space-x-2">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <span>數據總覽 (管理者)</span>
+                    </button>
+                    <button v-if="isAdmin" @click="activeTab = 'attendance-deduction'" :class="tabClass('attendance-deduction')" class="px-3.5 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap flex items-center space-x-2">
+                        <i class="fa-solid fa-clipboard-user text-amber-400"></i>
+                        <span>課堂簽到扣課 (管理者)</span>
+                    </button>
+                    <button v-if="isAdmin" @click="activeTab = 'students-courses'" :class="tabClass('students-courses')" class="px-3.5 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap flex items-center space-x-2">
+                        <i class="fa-solid fa-users"></i>
+                        <span>學員與課程管理</span>
+                    </button>
+                    <button v-if="isAdmin" @click="activeTab = 'payments'" :class="tabClass('payments')" class="px-3.5 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap flex items-center space-x-2">
+                        <i class="fa-solid fa-receipt"></i>
+                        <span>繳費歷史紀錄</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+            <!-- Global Toast Alert Box -->
+            <div v-if="toast.show" :class="toast.typeClass" class="mb-6 p-4 rounded-xl shadow-sm border flex items-center justify-between transition-all duration-300">
+                <div class="flex items-center space-x-3">
+                    <i :class="toast.iconClass" class="text-lg"></i>
+                    <span class="font-medium text-sm">{{ toast.message }}</span>
+                </div>
+                <button @click="toast.show = false" class="text-slate-400 hover:text-slate-600 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- 1. PUBLIC LOOKUP PORTAL -->
+            <section v-if="activeTab === 'public-lookup'" class="space-y-6">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 max-w-3xl mx-auto">
+                    <div class="text-center max-w-md mx-auto mb-8">
+                        <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-sky-100 text-sky-600 mb-3">
+                            <i class="fa-solid fa-id-card text-xl"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-800">學員課堂與餘額查詢</h2>
+                        <p class="text-slate-500 text-sm mt-1">請輸入學員編號或姓名進行快速查詢課程進度與剩餘課堂</p>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto">
+                        <input type="text" v-model="publicQuery" @keyup.enter="searchPublicStudent" placeholder="輸入學員編號 (如 STU-101) 或 學員姓名" class="flex-grow px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none text-slate-700">
+                        <button @click="searchPublicStudent" class="px-6 py-3 bg-sky-600 hover:bg-sky-700 text-white font-medium rounded-xl transition shadow-md flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <span>查詢</span>
+                        </button>
+                    </div>
+
+                    <!-- Lookup Results -->
+                    <div v-if="searchedPublicStudent" class="mt-8 border-t border-slate-100 pt-6">
+                        <div class="bg-slate-50 rounded-xl p-5 border border-slate-200 mb-6 flex items-center justify-between">
+                            <div>
+                                <span class="text-xs font-semibold px-2.5 py-1 bg-sky-100 text-sky-800 rounded-md">學員資料</span>
+                                <h3 class="text-xl font-bold text-slate-800 mt-1">{{ searchedPublicStudent.name }}</h3>
+                                <p class="text-xs text-slate-500 mt-0.5">編號: {{ searchedPublicStudent.id }} | 電話: {{ searchedPublicStudent.phone || '未提供' }}</p>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-slate-400 block">有記錄之課程</span>
+                                <span class="text-lg font-bold text-slate-700">{{ searchedPublicStudentPackages.length }} 門</span>
+                            </div>
+                        </div>
+
+                        <h4 class="font-semibold text-slate-700 mb-3 flex items-center space-x-2 text-sm">
+                            <i class="fa-solid fa-book-open text-sky-600"></i>
+                            <span>目前選修課程與剩餘課堂</span>
+                        </h4>
+
+                        <div v-if="searchedPublicStudentPackages.length === 0" class="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                            <p class="text-slate-400 text-sm">目前無任何課程包紀錄</p>
+                        </div>
+
+                        <div class="space-y-3">
+                            <div v-for="pkg in searchedPublicStudentPackages" :key="pkg.id" class="p-4 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div>
+                                    <span class="font-semibold text-slate-800 text-base">{{ pkg.courseName }}</span>
+                                    <div class="text-xs text-slate-400 mt-1 space-x-2">
+                                        <span>總購入: {{ pkg.totalLessons }} 節</span>
+                                        <span>•</span>
+                                        <span>更新於: {{ formatDate(pkg.lastUpdated) }}</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <span :class="pkg.remainingLessons < 0 ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'" class="px-3 py-1.5 rounded-lg text-sm font-bold">
+                                        {{ pkg.remainingLessons < 0 ? `欠課 ${Math.abs(pkg.remainingLessons)} 節` : `剩餘 ${pkg.remainingLessons} 節` }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. DASHBOARD (管理者專用，已刪除總收費金額卡片) -->
+            <section v-if="activeTab === 'dashboard' && isAdmin" class="space-y-6">
+                <!-- Summary Stats Cards (調整為 3 個管理者關心的營運指標) -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">總在籍學員</p>
+                            <h3 class="text-2xl font-extrabold text-slate-800 mt-1">{{ students.length }} 名</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-user-graduate"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">活躍學員課程</p>
+                            <h3 class="text-2xl font-extrabold text-slate-800 mt-1">{{ coursePackages.length }} 門</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-book-bookmark"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">欠課預警學員數</p>
+                            <h3 class="text-2xl font-extrabold text-rose-600 mt-1">{{ negativeBalanceStudentsCount }} 名</h3>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Alert & Actions -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Negative Balances Warning List -->
+                    <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-slate-800 flex items-center space-x-2">
+                                <i class="fa-solid fa-circle-exclamation text-rose-500"></i>
+                                <span>課堂不足 / 欠課學員提醒</span>
+                            </h3>
+                            <span class="text-xs bg-rose-100 text-rose-700 px-2.5 py-1 rounded-full font-semibold">請儘速聯繫補繳</span>
+                        </div>
+
+                        <div v-if="negativePackages.length === 0" class="text-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                            <i class="fa-solid fa-circle-check text-emerald-500 text-3xl mb-2"></i>
+                            <p class="text-slate-500 text-sm">目前無任何欠課學員，表現優良！</p>
+                        </div>
+
+                        <div v-else class="space-y-3 max-h-80 overflow-y-auto pr-1">
+                            <div v-for="pkg in negativePackages" :key="pkg.id" class="flex items-center justify-between p-3.5 bg-rose-50/50 hover:bg-rose-50 rounded-xl border border-rose-100 transition">
+                                <div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="font-bold text-slate-800">{{ getStudentName(pkg.studentId) }}</span>
+                                        <span class="text-xs text-slate-500">({{ pkg.studentId }})</span>
+                                    </div>
+                                    <p class="text-xs text-slate-600 mt-0.5">課程: <span class="font-medium text-slate-700">{{ pkg.courseName }}</span></p>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <span class="px-2.5 py-1 bg-rose-600 text-white font-bold text-xs rounded-lg shadow-sm">
+                                        欠 {{ Math.abs(pkg.remainingLessons) }} 節
+                                    </span>
+                                    <button @click="quickPurchaseFor(pkg)" class="px-3 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold shadow-sm transition">
+                                        補購儲值
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Navigation Cards -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between">
+                        <div>
+                            <h3 class="font-bold text-slate-800 mb-3 flex items-center space-x-2">
+                                <i class="fa-solid fa-bolt text-amber-500"></i>
+                                <span>快捷管理入口</span>
+                            </h3>
+                            <p class="text-xs text-slate-500 mb-4">點擊下方按鈕快速切換至主要管理功能模組</p>
+
+                            <div class="space-y-2.5">
+                                <button @click="activeTab = 'attendance-deduction'" class="w-full text-left p-3 rounded-xl bg-slate-50 hover:bg-sky-50 hover:border-sky-200 border border-slate-200 transition flex items-center justify-between group">
+                                    <div class="flex items-center space-x-3">
+                                        <i class="fa-solid fa-clipboard-check text-sky-600 group-hover:scale-110 transition-transform"></i>
+                                        <span class="text-sm font-semibold text-slate-700">獨立課程簽到扣課</span>
+                                    </div>
+                                    <i class="fa-solid fa-chevron-right text-xs text-slate-400"></i>
+                                </button>
+
+                                <button @click="activeTab = 'students-courses'" class="w-full text-left p-3 rounded-xl bg-slate-50 hover:bg-emerald-50 hover:border-emerald-200 border border-slate-200 transition flex items-center justify-between group">
+                                    <div class="flex items-center space-x-3">
+                                        <i class="fa-solid fa-user-plus text-emerald-600 group-hover:scale-110 transition-transform"></i>
+                                        <span class="text-sm font-semibold text-slate-700">新增學員 / 購買課程包</span>
+                                    </div>
+                                    <i class="fa-solid fa-chevron-right text-xs text-slate-400"></i>
+                                </button>
+
+                                <button @click="activeTab = 'payments'" class="w-full text-left p-3 rounded-xl bg-slate-50 hover:bg-purple-50 hover:border-purple-200 border border-slate-200 transition flex items-center justify-between group">
+                                    <div class="flex items-center space-x-3">
+                                        <i class="fa-solid fa-file-csv text-purple-600 group-hover:scale-110 transition-transform"></i>
+                                        <span class="text-sm font-semibold text-slate-700">繳費紀錄與報表匯出</span>
+                                    </div>
+                                    <i class="fa-solid fa-chevron-right text-xs text-slate-400"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 pt-4 border-t border-slate-100 text-xs text-slate-400 flex justify-between items-center">
+                            <span>系統狀態: 正常</span>
+                            <span>EduTrack v2.5</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. ATTENDANCE & DEDUCTION -->
+            <section v-if="activeTab === 'attendance-deduction' && isAdmin" class="space-y-6">
+                <!-- Header Banner -->
+                <div class="bg-gradient-to-r from-slate-900 to-sky-900 text-white rounded-2xl p-6 shadow-md">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <span class="px-2.5 py-1 bg-sky-500/20 text-sky-300 border border-sky-400/30 text-xs rounded-md font-semibold tracking-wide">獨立課程點名簽到</span>
+                            <h2 class="text-2xl font-bold mt-2">分科簽到與多學員批次扣課</h2>
+                            <p class="text-slate-300 text-sm mt-1">先選擇要扣課的獨立課程，系統即顯示選修該課程的學員，勾選後即可批量扣除課堂（允許扣至負數）。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Workflow Step 1: Select Course -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                    <label class="block text-sm font-bold text-slate-800 mb-2">
+                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-sky-600 text-white text-xs mr-2">1</span>
+                        選擇獨立課程 / 科目
+                    </label>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                        <div class="md:col-span-2">
+                            <select v-model="selectedAttendanceCourse" @change="onAttendanceCourseChange" class="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-slate-800 font-medium">
+                                <option value="">-- 請選擇欲進行簽到扣課的課程 --</option>
+                                <option v-for="course in uniqueCoursesList" :key="course" :value="course">
+                                    {{ course }} (選修學員: {{ getEnrolledStudentsCount(course) }} 人)
+                                </option>
+                            </select>
+                        </div>
+                        <div v-if="selectedAttendanceCourse" class="bg-sky-50 border border-sky-100 rounded-xl p-3 text-xs text-sky-800">
+                            <strong>目前選擇:</strong> {{ selectedAttendanceCourse }}
+                            <span class="block mt-0.5 text-sky-600">已列出下方 {{ enrolledStudentsForCourse.length }} 名選修學員</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Workflow Step 2: Display Enrolled Students & Batch Deduction Controls -->
+                <div v-if="selectedAttendanceCourse" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                        <div>
+                            <label class="block text-sm font-bold text-slate-800 mb-1">
+                                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-sky-600 text-white text-xs mr-2">2</span>
+                                勾選參課學員與扣除設定
+                            </label>
+                            <p class="text-xs text-slate-500">打勾表示學員有出席此堂課，將從對應課程包扣除剩餘節數</p>
+                        </div>
+
+                        <!-- Global Checkbox Actions -->
+                        <div class="flex items-center space-x-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                            <button @click="selectAllEnrolled(true)" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition shadow-sm">
+                                全選 ({{ enrolledStudentsForCourse.length }})
+                            </button>
+                            <button @click="selectAllEnrolled(false)" class="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition shadow-sm">
+                                全不選
+                            </button>
+                            <span class="text-xs text-slate-400">|</span>
+                            <span class="text-xs font-bold text-sky-700">已選取 {{ selectedStudentPackageIds.length }} 名學員</span>
+                        </div>
+                    </div>
+
+                    <!-- Deduction Settings -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">本次扣除課堂節數</label>
+                            <div class="flex items-center">
+                                <input type="number" v-model.number="deductAmount" min="1" max="10" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-slate-800 font-semibold">
+                                <span class="ml-2 text-xs text-slate-500 font-medium whitespace-nowrap">節 / 人</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">簽到 / 扣課日期</label>
+                            <input type="date" v-model="deductDate" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-slate-800 font-medium">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">備註 / 簽到記錄 (選填)</label>
+                            <input type="text" v-model="deductRemark" placeholder="如：第 4 單元課堂簽到" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-slate-800 text-xs">
+                        </div>
+                    </div>
+
+                    <!-- Enrolled Students Grid/Table -->
+                    <div v-if="enrolledStudentsForCourse.length === 0" class="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                        <i class="fa-solid fa-users-slash text-slate-300 text-3xl mb-2"></i>
+                        <p class="text-slate-500 text-sm">目前無任何學員選修此課程「{{ selectedAttendanceCourse }}」</p>
+                    </div>
+
+                    <div v-else class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-xs font-semibold text-slate-500 bg-slate-50">
+                                    <th class="py-3 px-4 w-12 text-center">選取</th>
+                                    <th class="py-3 px-4">學員姓名 (編號)</th>
+                                    <th class="py-3 px-4">目前剩餘課堂</th>
+                                    <th class="py-3 px-4">扣課後預計剩餘</th>
+                                    <th class="py-3 px-4">狀態提示</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-sm">
+                                <tr v-for="item in enrolledStudentsForCourse" :key="item.packageId" class="hover:bg-slate-50/80 transition" :class="{'bg-sky-50/30': isStudentSelected(item.packageId)}">
+                                    <td class="py-3 px-4 text-center">
+                                        <input type="checkbox" :value="item.packageId" v-model="selectedStudentPackageIds" class="w-4 h-4 text-sky-600 rounded border-slate-300 focus:ring-sky-500 cursor-pointer">
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <div class="font-bold text-slate-800">{{ item.studentName }}</div>
+                                        <div class="text-xs text-slate-400">{{ item.studentId }} | 電話: {{ item.studentPhone || '未填' }}</div>
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <span :class="item.remainingLessons < 0 ? 'text-rose-600 font-bold' : 'text-slate-700 font-semibold'">
+                                            {{ item.remainingLessons < 0 ? `欠 ${Math.abs(item.remainingLessons)} 節` : `${item.remainingLessons} 節` }}
+                                        </span>
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <span v-if="isStudentSelected(item.packageId)" :class="(item.remainingLessons - deductAmount) < 0 ? 'text-rose-600 font-bold' : 'text-emerald-600 font-bold'">
+                                            {{ (item.remainingLessons - deductAmount) < 0 ? `欠 ${Math.abs(item.remainingLessons - deductAmount)} 節` : `${item.remainingLessons - deductAmount} 節` }}
+                                        </span>
+                                        <span v-else class="text-slate-400 text-xs">--</span>
+                                    </td>
+                                    <td class="py-3 px-4">
+                                        <span v-if="(item.remainingLessons - deductAmount) < 0 && isStudentSelected(item.packageId)" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">
+                                            <i class="fa-solid fa-triangle-exclamation mr-1 text-xs"></i> 扣至負數 (欠課)
+                                        </span>
+                                        <span v-else-if="isStudentSelected(item.packageId)" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                                            <i class="fa-solid fa-check mr-1 text-xs"></i> 課堂充足
+                                        </span>
+                                        <span v-else class="text-slate-400 text-xs">未勾選</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Batch Submit Button -->
+                    <div class="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div class="text-xs text-slate-500">
+                            <i class="fa-solid fa-info-circle text-sky-500 mr-1"></i>
+                            點擊按鈕後將立即對勾選之 {{ selectedStudentPackageIds.length }} 位學員完成《{{ selectedAttendanceCourse }}》課程扣課。
+                        </div>
+                        <button @click="submitBatchDeduction" :disabled="selectedStudentPackageIds.length === 0" class="w-full sm:w-auto px-6 py-3 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md transition flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-user-check"></i>
+                            <span>確認簽到並進行批次扣課 ({{ selectedStudentPackageIds.length }}人)</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. STUDENTS & COURSES MANAGEMENT -->
+            <section v-if="activeTab === 'students-courses' && isAdmin" class="space-y-6">
+                <!-- Action Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">學員與課程管理</h2>
+                        <p class="text-xs text-slate-500 mt-1">管理在籍學員名單、新增學員或為學員購買/儲值新的獨立課程包</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button @click="openAddStudentModal" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm rounded-xl transition shadow-sm flex items-center space-x-2">
+                            <i class="fa-solid fa-user-plus"></i>
+                            <span>新增學員</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Students List Table -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <input type="text" v-model="studentFilter" placeholder="搜尋學員姓名或編號..." class="px-3.5 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none w-full sm:w-64">
+                        <span class="text-xs text-slate-400">共 {{ filteredStudents.length }} 名學員</span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500">
+                                    <th class="py-3.5 px-4">學員資訊</th>
+                                    <th class="py-3.5 px-4">聯絡電話</th>
+                                    <th class="py-3.5 px-4">已修課數</th>
+                                    <th class="py-3.5 px-4">選修課程明細與餘額</th>
+                                    <th class="py-3.5 px-4 text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-sm">
+                                <tr v-for="stu in filteredStudents" :key="stu.id" class="hover:bg-slate-50/80 transition">
+                                    <td class="py-3.5 px-4">
+                                        <div class="font-bold text-slate-800">{{ stu.name }}</div>
+                                        <div class="text-xs text-slate-400">ID: {{ stu.id }}</div>
+                                    </td>
+                                    <td class="py-3.5 px-4 text-slate-600 text-xs">
+                                        {{ stu.phone || '未提供' }}
+                                    </td>
+                                    <td class="py-3.5 px-4">
+                                        <span class="px-2 py-1 bg-slate-100 rounded text-xs font-semibold text-slate-600">
+                                            {{ getStudentPackages(stu.id).length }} 門
+                                        </span>
+                                    </td>
+                                    <td class="py-3.5 px-4">
+                                        <div class="space-y-1">
+                                            <div v-for="pkg in getStudentPackages(stu.id)" :key="pkg.id" class="text-xs flex items-center space-x-2">
+                                                <span class="font-medium text-slate-700">{{ pkg.courseName }}:</span>
+                                                <span :class="pkg.remainingLessons < 0 ? 'text-rose-600 font-bold' : 'text-slate-600'">
+                                                    {{ pkg.remainingLessons < 0 ? `欠 ${Math.abs(pkg.remainingLessons)} 節` : `${pkg.remainingLessons} 節` }}
+                                                </span>
+                                            </div>
+                                            <span v-if="getStudentPackages(stu.id).length === 0" class="text-xs text-slate-400 italic">尚無任何課程包</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3.5 px-4 text-right space-x-2">
+                                        <button @click="openAddPackageModal(stu)" class="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-xs font-semibold transition">
+                                            <i class="fa-solid fa-plus text-xs mr-1"></i> 購買/儲值課程
+                                        </button>
+                                        <button @click="deleteStudent(stu)" class="px-2.5 py-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg text-xs transition" title="刪除學員">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. PAYMENT HISTORY & REPORTS -->
+            <section v-if="activeTab === 'payments' && isAdmin" class="space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">繳費歷史與財務紀錄</h2>
+                        <p class="text-xs text-slate-500 mt-1">完整紀錄所有學員購買課程包與儲值繳費交易</p>
+                    </div>
+                    <button @click="exportToCSV" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-sm rounded-xl transition shadow-sm flex items-center space-x-2">
+                        <i class="fa-solid fa-file-csv text-emerald-400"></i>
+                        <span>匯出 CSV 報表</span>
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500">
+                                    <th class="py-3.5 px-4">交易日期</th>
+                                    <th class="py-3.5 px-4">學員姓名 (編號)</th>
+                                    <th class="py-3.5 px-4">購買課程名稱</th>
+                                    <th class="py-3.5 px-4">購買節數</th>
+                                    <th class="py-3.5 px-4">實收金額</th>
+                                    <th class="py-3.5 px-4">經手人 / 備註</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-sm">
+                                <tr v-for="pay in paymentLogs" :key="pay.id" class="hover:bg-slate-50/80 transition">
+                                    <td class="py-3.5 px-4 text-xs font-medium text-slate-500">{{ formatDate(pay.date) }}</td>
+                                    <td class="py-3.5 px-4">
+                                        <span class="font-bold text-slate-800">{{ getStudentName(pay.studentId) }}</span>
+                                        <span class="text-xs text-slate-400 ml-1">({{ pay.studentId }})</span>
+                                    </td>
+                                    <td class="py-3.5 px-4 font-semibold text-slate-700">{{ pay.courseName }}</td>
+                                    <td class="py-3.5 px-4 text-slate-600 font-medium">+{{ pay.lessons }} 節</td>
+                                    <td class="py-3.5 px-4 font-bold text-emerald-600">${{ formatMoney(pay.amount) }}</td>
+                                    <td class="py-3.5 px-4 text-xs text-slate-500">{{ pay.remark || '學員課程儲值' }}</td>
+                                </tr>
+                                <tr v-if="paymentLogs.length === 0">
+                                    <td colspan="6" class="text-center py-8 text-slate-400 text-sm">尚無任何繳費歷史紀錄</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- MODALS -->
+
+        <!-- Admin Login Modal -->
+        <div v-if="showLoginModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full p-6 relative">
+                <button @click="showLoginModal = false" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+                <div class="text-center mb-6">
+                    <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center mx-auto mb-3 text-xl">
+                        <i class="fa-solid fa-user-shield"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-800">管理者身分驗證</h3>
+                    <p class="text-xs text-slate-500 mt-1">請輸入管理密碼以解鎖數據總覽與管理權限</p>
+                </div>
+                <form @submit.prevent="login">
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold text-slate-700 mb-1">管理密碼</label>
+                        <input type="password" v-model="loginPassword" placeholder="預設密碼: admin123" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm">
+                    </div>
+                    <button type="submit" class="w-full py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl shadow-md transition text-sm">
+                        確認登入
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Password Change Modal -->
+        <div v-if="showPasswordModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full p-6 relative">
+                <button @click="showPasswordModal = false" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+                <div class="text-center mb-6">
+                    <h3 class="text-lg font-bold text-slate-800">修改管理者密碼</h3>
+                </div>
+                <form @submit.prevent="changePassword">
+                    <div class="space-y-3 mb-5">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">原密碼</label>
+                            <input type="password" v-model="passForm.old" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">新密碼</label>
+                            <input type="password" v-model="passForm.new" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl shadow-md transition text-sm">
+                        儲存新密碼
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add Student Modal -->
+        <div v-if="showAddStudentModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full p-6 relative">
+                <button @click="showAddStudentModal = false" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+                <h3 class="text-lg font-bold text-slate-800 mb-4">新增學員基本資料</h3>
+                <form @submit.prevent="saveStudent">
+                    <div class="space-y-4 mb-6">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">學員編號 (系統自動產生或自訂)</label>
+                            <input type="text" v-model="studentForm.id" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">學員姓名 *</label>
+                            <input type="text" v-model="studentForm.name" required placeholder="如：張小明" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">聯絡電話</label>
+                            <input type="text" v-model="studentForm.phone" placeholder="如：0912345678" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition text-sm">
+                        建立學員
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add / Purchase Package Modal -->
+        <div v-if="showAddPackageModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full p-6 relative">
+                <button @click="showAddPackageModal = false" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+                <h3 class="text-lg font-bold text-slate-800 mb-1">購買 / 儲值課程包</h3>
+                <p class="text-xs text-slate-500 mb-4">學員: <strong class="text-slate-800">{{ targetStudent?.name }}</strong> ({{ targetStudent?.id }})</p>
+
+                <form @submit.prevent="savePackage">
+                    <div class="space-y-4 mb-6">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">獨立課程名稱 *</label>
+                            <input type="text" v-model="packageForm.courseName" required placeholder="如：國中數學班 / 英文文法檢定" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">購買堂數 (節) *</label>
+                                <input type="number" v-model.number="packageForm.lessons" min="1" required class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm font-bold">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">實收金額 ($) *</label>
+                                <input type="number" v-model.number="packageForm.amount" min="0" required class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm font-bold">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">交易備註</label>
+                            <input type="text" v-model="packageForm.remark" placeholder="如：現金繳費 / 優惠包續約" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none text-sm">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full py.2.5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl shadow-md transition text-sm">
+                        確認入帳並儲值
+                    </button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Vue App Script Logic -->
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    activeTab: 'public-lookup', // public-lookup, dashboard, attendance-deduction, students-courses, payments
+                    isAdmin: false,
+                    adminPassword: 'admin123',
+                    showLoginModal: false,
+                    showPasswordModal: false,
+                    loginPassword: '',
+                    passForm: { old: '', new: '' },
+
+                    // Global Toast Alert
+                    toast: {
+                        show: false,
+                        message: '',
+                        typeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                        iconClass: 'fa-solid fa-circle-check text-emerald-500'
+                    },
+
+                    // Data Store (LocalStorage Backup)
+                    students: [
+                        { id: 'STU-101', name: '王小明', phone: '0912-345678' },
+                        { id: 'STU-102', name: '李美玲', phone: '0923-456789' },
+                        { id: 'STU-103', name: '陳大為', phone: '0934-567890' }
+                    ],
+                    coursePackages: [
+                        { id: 'PKG-1', studentId: 'STU-101', courseName: '高中數學衝刺班', totalLessons: 10, remainingLessons: 8, lastUpdated: new Date().toISOString() },
+                        { id: 'PKG-2', studentId: 'STU-101', courseName: '全民英檢中級班', totalLessons: 12, remainingLessons: -1, lastUpdated: new Date().toISOString() },
+                        { id: 'PKG-3', studentId: 'STU-102', courseName: '高中數學衝刺班', totalLessons: 10, remainingLessons: 2, lastUpdated: new Date().toISOString() },
+                        { id: 'PKG-4', studentId: 'STU-103', courseName: '國中物理化學班', totalLessons: 8, remainingLessons: -2, lastUpdated: new Date().toISOString() }
+                    ],
+                    paymentLogs: [
+                        { id: 'PAY-101', studentId: 'STU-101', courseName: '高中數學衝刺班', lessons: 10, amount: 6000, date: new Date().toISOString(), remark: '現金一次付清' },
+                        { id: 'PAY-102', studentId: 'STU-101', courseName: '全民英檢中級班', lessons: 12, amount: 7200, date: new Date().toISOString(), remark: '轉帳繳費' },
+                        { id: 'PAY-103', studentId: 'STU-102', courseName: '高中數學衝刺班', lessons: 10, amount: 6000, date: new Date().toISOString(), remark: '現金繳費' },
+                        { id: 'PAY-104', studentId: 'STU-103', courseName: '國中物理化學班', lessons: 8, amount: 4800, date: new Date().toISOString(), remark: '現金繳費' }
+                    ],
+
+                    // Public Lookup
+                    publicQuery: '',
+                    searchedPublicStudent: null,
+
+                    // Attendance & Batch Deduction
+                    selectedAttendanceCourse: '',
+                    selectedStudentPackageIds: [],
+                    deductAmount: 1,
+                    deductDate: new Date().toISOString().split('T')[0],
+                    deductRemark: '',
+
+                    // Management Modals
+                    showAddStudentModal: false,
+                    studentForm: { id: '', name: '', phone: '' },
+                    studentFilter: '',
+
+                    showAddPackageModal: false,
+                    targetStudent: null,
+                    packageForm: { courseName: '', lessons: 10, amount: 5000, remark: '' }
+                }
+            },
+            computed: {
+                negativePackages() {
+                    return this.coursePackages.filter(p => p.remainingLessons < 0);
+                },
+                negativeBalanceStudentsCount() {
+                    const studentIds = new Set(this.negativePackages.map(p => p.studentId));
+                    return studentIds.size;
+                },
+                uniqueCoursesList() {
+                    const list = this.coursePackages.map(p => p.courseName);
+                    return [...new Set(list)];
+                },
+                enrolledStudentsForCourse() {
+                    if (!this.selectedAttendanceCourse) return [];
+                    return this.coursePackages
+                        .filter(p => p.courseName === this.selectedAttendanceCourse)
+                        .map(p => {
+                            const student = this.students.find(s => s.id === p.studentId) || {};
+                            return {
+                                packageId: p.id,
+                                studentId: p.studentId,
+                                studentName: student.name || '未知學員',
+                                studentPhone: student.phone || '',
+                                remainingLessons: p.remainingLessons,
+                                totalLessons: p.totalLessons
+                            };
+                        });
+                },
+                searchedPublicStudentPackages() {
+                    if (!this.searchedPublicStudent) return [];
+                    return this.coursePackages.filter(p => p.studentId === this.searchedPublicStudent.id);
+                },
+                filteredStudents() {
+                    if (!this.studentFilter) return this.students;
+                    const query = this.studentFilter.toLowerCase();
+                    return this.students.filter(s => s.name.toLowerCase().includes(query) || s.id.toLowerCase().includes(query));
+                }
+            },
+            mounted() {
+                this.loadFromStorage();
+            },
+            methods: {
+                tabClass(tabName) {
+                    return this.activeTab === tabName 
+                        ? 'bg-sky-600 text-white shadow-sm' 
+                        : 'text-slate-300 hover:text-white hover:bg-slate-700';
+                },
+                showNotification(msg, type = 'success') {
+                    this.toast.message = msg;
+                    if (type === 'success') {
+                        this.toast.typeClass = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+                        this.toast.iconClass = 'fa-solid fa-circle-check text-emerald-500';
+                    } else if (type === 'error') {
+                        this.toast.typeClass = 'bg-rose-50 text-rose-800 border-rose-200';
+                        this.toast.iconClass = 'fa-solid fa-triangle-exclamation text-rose-500';
+                    }
+                    this.toast.show = true;
+                    setTimeout(() => { this.toast.show = false; }, 4000);
+                },
+                formatDate(dateStr) {
+                    if (!dateStr) return '';
+                    const d = new Date(dateStr);
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                },
+                formatMoney(num) {
+                    return (num || 0).toLocaleString();
+                },
+                getStudentName(studentId) {
+                    const s = this.students.find(item => item.id === studentId);
+                    return s ? s.name : studentId;
+                },
+                getStudentPackages(studentId) {
+                    return this.coursePackages.filter(p => p.studentId === studentId);
+                },
+                getEnrolledStudentsCount(courseName) {
+                    return this.coursePackages.filter(p => p.courseName === courseName).length;
+                },
+
+                // Authentication
+                login() {
+                    if (this.loginPassword === this.adminPassword) {
+                        this.isAdmin = true;
+                        this.showLoginModal = false;
+                        this.loginPassword = '';
+                        this.activeTab = 'dashboard'; // 登入後自動跳轉至管理者數據總覽
+                        this.showNotification('管理者成功登入！');
+                    } else {
+                        alert('密碼錯誤！(預設密碼為: admin123)');
+                    }
+                },
+                logout() {
+                    this.isAdmin = false;
+                    if (this.activeTab !== 'public-lookup') {
+                        this.activeTab = 'public-lookup';
+                    }
+                    this.showNotification('已登出管理者權限');
+                },
+                changePassword() {
+                    if (this.passForm.old !== this.adminPassword) {
+                        alert('原密碼輸入錯誤');
+                        return;
+                    }
+                    if (!this.passForm.new) {
+                        alert('請輸入新密碼');
+                        return;
+                    }
+                    this.adminPassword = this.passForm.new;
+                    this.showPasswordModal = false;
+                    this.passForm = { old: '', new: '' };
+                    this.saveToStorage();
+                    this.showNotification('管理者密碼已更換成功！');
+                },
+
+                // Public Student Search
+                searchPublicStudent() {
+                    const q = this.publicQuery.trim().toLowerCase();
+                    if (!q) return;
+                    const found = this.students.find(s => s.id.toLowerCase() === q || s.name.toLowerCase() === q);
+                    if (found) {
+                        this.searchedPublicStudent = found;
+                    } else {
+                        this.searchedPublicStudent = null;
+                        this.showNotification('查無此學員資料，請核對姓名或編號', 'error');
+                    }
+                },
+
+                // Attendance Deduction Workflow
+                onAttendanceCourseChange() {
+                    this.selectedStudentPackageIds = [];
+                },
+                selectAllEnrolled(check) {
+                    if (check) {
+                        this.selectedStudentPackageIds = this.enrolledStudentsForCourse.map(s => s.packageId);
+                    } else {
+                        this.selectedStudentPackageIds = [];
+                    }
+                },
+                isStudentSelected(packageId) {
+                    return this.selectedStudentPackageIds.includes(packageId);
+                },
+                submitBatchDeduction() {
+                    if (this.selectedStudentPackageIds.length === 0) return;
+                    
+                    let deductedCount = 0;
+                    this.selectedStudentPackageIds.forEach(pkgId => {
+                        const pkg = this.coursePackages.find(p => p.id === pkgId);
+                        if (pkg) {
+                            pkg.remainingLessons -= this.deductAmount;
+                            pkg.lastUpdated = new Date().toISOString();
+                            deductedCount++;
+                        }
+                    });
+
+                    this.saveToStorage();
+                    this.showNotification(`成功完成《${this.selectedAttendanceCourse}》簽到！已扣除 ${deductedCount} 位學員各 ${this.deductAmount} 節課堂。`);
+                    this.selectedStudentPackageIds = [];
+                },
+
+                // Quick Action
+                quickPurchaseFor(pkg) {
+                    const student = this.students.find(s => s.id === pkg.studentId);
+                    if (student) {
+                        this.openAddPackageModal(student, pkg.courseName);
+                    }
+                },
+
+                // Student & Package Management
+                openAddStudentModal() {
+                    const nextNum = this.students.length + 101;
+                    this.studentForm = {
+                        id: `STU-${nextNum}`,
+                        name: '',
+                        phone: ''
+                    };
+                    this.showAddStudentModal = true;
+                },
+                saveStudent() {
+                    if (!this.studentForm.name) return;
+                    this.students.push({ ...this.studentForm });
+                    this.saveToStorage();
+                    this.showAddStudentModal = false;
+                    this.showNotification(`已新增學員：${this.studentForm.name}`);
+                },
+                deleteStudent(stu) {
+                    if (confirm(`確定要刪除學員「${stu.name}」及其相關的所有課程包與紀錄嗎？`)) {
+                        this.students = this.students.filter(s => s.id !== stu.id);
+                        this.coursePackages = this.coursePackages.filter(p => p.studentId !== stu.id);
+                        this.saveToStorage();
+                        this.showNotification(`已刪除學員 ${stu.name}`);
+                    }
+                },
+                openAddPackageModal(student, defaultCourseName = '') {
+                    this.targetStudent = student;
+                    this.packageForm = {
+                        courseName: defaultCourseName || '',
+                        lessons: 10,
+                        amount: 6000,
+                        remark: '學員續約儲值'
+                    };
+                    this.showAddPackageModal = true;
+                },
+                savePackage() {
+                    if (!this.targetStudent || !this.packageForm.courseName) return;
+
+                    let existingPkg = this.coursePackages.find(p => p.studentId === this.targetStudent.id && p.courseName === this.packageForm.courseName);
+
+                    if (existingPkg) {
+                        existingPkg.totalLessons += this.packageForm.lessons;
+                        existingPkg.remainingLessons += this.packageForm.lessons;
+                        existingPkg.lastUpdated = new Date().toISOString();
+                    } else {
+                        const newPkg = {
+                            id: `PKG-${Date.now()}`,
+                            studentId: this.targetStudent.id,
+                            courseName: this.packageForm.courseName,
+                            totalLessons: this.packageForm.lessons,
+                            remainingLessons: this.packageForm.lessons,
+                            lastUpdated: new Date().toISOString()
+                        };
+                        this.coursePackages.push(newPkg);
+                    }
+
+                    const payment = {
+                        id: `PAY-${Date.now()}`,
+                        studentId: this.targetStudent.id,
+                        courseName: this.packageForm.courseName,
+                        lessons: this.packageForm.lessons,
+                        amount: this.packageForm.amount,
+                        date: new Date().toISOString(),
+                        remark: this.packageForm.remark
+                    };
+                    this.paymentLogs.unshift(payment);
+
+                    this.saveToStorage();
+                    this.showAddPackageModal = false;
+                    this.showNotification(`成功為 ${this.targetStudent.name} 儲值《${this.packageForm.courseName}》${this.packageForm.lessons} 節！`);
+                },
+
+                // CSV Export
+                exportToCSV() {
+                    if (this.paymentLogs.length === 0) {
+                        alert('尚無任何歷史繳費紀錄可匯出');
+                        return;
+                    }
+                    let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+                    csvContent += "交易日期,學員編號,學員姓名,購買課程名稱,購買節數,實收金額,備註\n";
+
+                    this.paymentLogs.forEach(p => {
+                        const sName = this.getStudentName(p.studentId);
+                        const date = this.formatDate(p.date);
+                        csvContent += `"${date}","${p.studentId}","${sName}","${p.courseName}",${p.lessons},${p.amount},"${p.remark || ''}"\n`;
+                    });
+
+                    const encodedUri = encodeURI(csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", `EduTrack_Payment_Report_${new Date().toISOString().split('T')[0]}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                },
+
+                // LocalStorage Persistence
+                saveToStorage() {
+                    localStorage.setItem('edutrack_students', JSON.stringify(this.students));
+                    localStorage.setItem('edutrack_packages', JSON.stringify(this.coursePackages));
+                    localStorage.setItem('edutrack_payments', JSON.stringify(this.paymentLogs));
+                    localStorage.setItem('edutrack_admin_pass', this.adminPassword);
+                },
+                loadFromStorage() {
+                    const s = localStorage.getItem('edutrack_students');
+                    const p = localStorage.getItem('edutrack_packages');
+                    const pay = localStorage.getItem('edutrack_payments');
+                    const pass = localStorage.getItem('edutrack_admin_pass');
+
+                    if (s) this.students = JSON.parse(s);
+                    if (p) this.coursePackages = JSON.parse(p);
+                    if (pay) this.paymentLogs = JSON.parse(pay);
+                    if (pass) this.adminPassword = pass;
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
